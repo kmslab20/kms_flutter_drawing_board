@@ -172,23 +172,28 @@ class _PainterState extends State<Painter> {
 
   @override
   Widget build(BuildContext context) {
+    // 선택 모드일 때는 Listener가 이벤트를 가로채지 않도록 함
+    final bool isSelectionMode = widget.drawingController.isSelectionMode;
+
     return Listener(
-      onPointerDown: _onPointerDown,
-      onPointerMove: _onPointerMove,
-      onPointerUp: _onPointerUp,
-      onPointerCancel: _onPointerCancel,
-      behavior: HitTestBehavior.opaque,
+      onPointerDown: isSelectionMode ? null : _onPointerDown,
+      onPointerMove: isSelectionMode ? null : _onPointerMove,
+      onPointerUp: isSelectionMode ? null : _onPointerUp,
+      onPointerCancel: isSelectionMode ? null : _onPointerCancel,
+      behavior: isSelectionMode ? HitTestBehavior.translucent : HitTestBehavior.opaque,
       child: ExValueBuilder<DrawConfig>(
         valueListenable: widget.drawingController.drawConfig,
-        shouldRebuild: (DrawConfig p, DrawConfig n) => p.fingerCount != n.fingerCount,
+        shouldRebuild: (DrawConfig p, DrawConfig n) =>
+            p.fingerCount != n.fingerCount || p.isSelectionMode != n.isSelectionMode,
         builder: (_, DrawConfig config, Widget? child) {
-          // 是否能拖动画布
+          // 선택 모드가 아니고, 손가락이 1개일 때만 GestureDetector 활성화
           final bool isPanEnabled = config.fingerCount > 1;
+          final bool useGestureDetector = !config.isSelectionMode;
 
           return GestureDetector(
-            onPanDown: !isPanEnabled ? _onPanDown : null,
-            onPanUpdate: !isPanEnabled ? _onPanUpdate : null,
-            onPanEnd: !isPanEnabled ? _onPanEnd : null,
+            onPanDown: (useGestureDetector && !isPanEnabled) ? _onPanDown : null,
+            onPanUpdate: (useGestureDetector && !isPanEnabled) ? _onPanUpdate : null,
+            onPanEnd: (useGestureDetector && !isPanEnabled) ? _onPanEnd : null,
             child: child,
           );
         },
