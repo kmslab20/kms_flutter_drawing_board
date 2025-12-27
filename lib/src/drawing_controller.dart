@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+
 import 'helper/safe_value_notifier.dart';
 import 'paint_contents/eraser.dart';
 import 'paint_contents/paint_content.dart';
@@ -23,6 +24,7 @@ class DrawConfig {
     this.angle = 0,
     this.fingerCount = 0,
     this.size,
+    this.isSelectionMode = false,
     this.blendMode = BlendMode.srcOver,
     this.color = Colors.red,
     this.colorFilter,
@@ -43,6 +45,7 @@ class DrawConfig {
     this.angle = 0,
     this.fingerCount = 0,
     this.size,
+    this.isSelectionMode = false,
     this.blendMode = BlendMode.srcOver,
     this.color = Colors.red,
     this.colorFilter,
@@ -73,12 +76,17 @@ class DrawConfig {
   /// Number of fingers currently touching
   final int fingerCount;
 
-  /// 画板尺寸
+  /// 화판 尺寸
   ///
   /// Board size
   final Size? size;
 
-  /// 混合模式
+  /// 선택 모드 여부 (true: 캔버스 확대/축소/이동 가능, false: 그리기 모드)
+  ///
+  /// Whether selection mode is enabled (true: canvas zoom/pan enabled, false: drawing mode)
+  final bool isSelectionMode;
+
+  /// 혼합 모드
   ///
   /// Blend mode for painting
   final BlendMode blendMode;
@@ -179,6 +187,7 @@ class DrawConfig {
     int? angle,
     int? fingerCount,
     Size? size,
+    bool? isSelectionMode,
   }) {
     return DrawConfig(
       contentType: contentType ?? this.contentType,
@@ -198,6 +207,7 @@ class DrawConfig {
       style: style ?? this.style,
       fingerCount: fingerCount ?? this.fingerCount,
       size: size ?? this.size,
+      isSelectionMode: isSelectionMode ?? this.isSelectionMode,
     );
   }
 }
@@ -328,6 +338,11 @@ class DrawingController extends ChangeNotifier {
   /// Whether drawing is allowed (when single finger is touching)
   bool get couldDrawing => drawConfig.value.fingerCount == 1;
 
+  /// 是否处于选择模式
+  ///
+  /// Whether in selection mode
+  bool get isSelectionMode => drawConfig.value.isSelectionMode;
+
   /// 是否有正在绘制的内容
   ///
   /// Whether there is content being drawn
@@ -343,6 +358,13 @@ class DrawingController extends ChangeNotifier {
   /// Set board size
   void setBoardSize(Size? size) {
     drawConfig.value = drawConfig.value.copyWith(size: size);
+  }
+
+  /// 设置选择模式
+  ///
+  /// Set selection mode
+  void setSelectionMode(bool enabled) {
+    drawConfig.value = drawConfig.value.copyWith(isSelectionMode: enabled);
   }
 
   /// 增加手指计数（手指按下时调用）

@@ -312,6 +312,44 @@ DrawingBoard(
 )
 ```
 
+#### 选择模式
+
+控制画布平移/缩放与绘图模式的切换：
+
+```dart
+// 启用选择模式（画布平移/缩放启用，绘图禁用）
+_drawingController.setSelectionMode(true);
+
+// 启用绘图模式（绘图启用，画布平移/缩放禁用）
+_drawingController.setSelectionMode(false);
+
+// 检查当前模式
+bool isSelection = _drawingController.isSelectionMode;
+```
+
+在工具栏添加选择模式切换按钮：
+
+```dart
+DrawingBar(
+  controller: _drawingController,
+  tools: [
+    // ... 其他工具 ...
+    DefaultActionItem(
+      onTap: (controller) {
+        controller.setSelectionMode(!controller.isSelectionMode);
+      },
+      childBuilder: (context, controller) {
+        return Icon(
+          controller.isSelectionMode ? Icons.pan_tool : Icons.edit,
+          size: 24,
+          color: controller.isSelectionMode ? Colors.blue : Colors.grey,
+        );
+      },
+    ),
+  ],
+)
+```
+
 ### 4. 工具栏系统
 
 #### DrawingBar

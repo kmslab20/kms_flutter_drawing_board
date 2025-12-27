@@ -388,6 +388,23 @@ class _MyHomePageState extends State<MyHomePage> {
                   DefaultActionItem.redo(),
                   DefaultActionItem.turn(),
                   DefaultActionItem.clear(),
+                  // 선택 모드 토글 버튼 (Selection mode toggle)
+                  DefaultActionItem(
+                    onTap: (controller) {
+                      controller.setSelectionMode(!controller.isSelectionMode);
+                    },
+                    childBuilder: (context, controller) {
+                      return Icon(
+                        controller.isSelectionMode
+                            ? Icons.pan_tool // 선택 모드 (확대/축소/이동)
+                            : Icons.edit, // 그리기 모드
+                        size: 24,
+                        color: controller.isSelectionMode
+                            ? Colors.blue
+                            : Colors.grey,
+                      );
+                    },
+                  ),
                 ],
               ),
               DrawingBar(

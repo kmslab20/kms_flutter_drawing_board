@@ -1,3 +1,19 @@
+## [1.1.0] - 2025-12-28
+
+### New Features
+- Added **Selection Mode** to control canvas pan/zoom behavior
+  - `DrawingController.setSelectionMode(bool)` - Toggle between selection mode and drawing mode
+  - `DrawingController.isSelectionMode` - Check current mode
+  - In selection mode: Canvas pan/zoom enabled, drawing disabled
+  - In drawing mode: Drawing enabled, canvas pan/zoom disabled
+- Added selection mode toggle button example in demo app
+
+### Documentation
+- Added Selection Mode usage guide to README.md and README-zh-CN.md
+- Updated example app with selection mode toggle button
+
+---
+
 ## [1.0.1+1] - 2025-12-26
 
 ### Bug Fixes

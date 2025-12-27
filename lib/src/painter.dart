@@ -71,6 +71,11 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer down event
   void _onPointerDown(PointerDownEvent pde) {
+    // 선택 모드에서는 그리기 비활성화
+    if (widget.drawingController.isSelectionMode) {
+      return;
+    }
+
     if (!widget.drawingController.couldStartDraw) {
       return;
     }
@@ -103,6 +108,11 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer move event
   void _onPointerMove(PointerMoveEvent pme) {
+    // 선택 모드에서는 그리기 비활성화
+    if (widget.drawingController.isSelectionMode) {
+      return;
+    }
+
     if (!widget.drawingController.couldDrawing) {
       if (widget.drawingController.hasPaintingContent) {
         widget.drawingController.endDraw();
@@ -123,6 +133,11 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer up event
   void _onPointerUp(PointerUpEvent pue) {
+    // 선택 모드에서는 그리기 비활성화
+    if (widget.drawingController.isSelectionMode) {
+      return;
+    }
+
     if (!widget.drawingController.couldDrawing || !widget.drawingController.hasPaintingContent) {
       return;
     }

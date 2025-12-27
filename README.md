@@ -312,6 +312,44 @@ DrawingBoard(
 )
 ```
 
+#### Selection Mode
+
+Control when canvas pan/zoom is enabled vs drawing mode:
+
+```dart
+// Enable selection mode (canvas pan/zoom enabled, drawing disabled)
+_drawingController.setSelectionMode(true);
+
+// Enable drawing mode (drawing enabled, canvas pan/zoom disabled)
+_drawingController.setSelectionMode(false);
+
+// Check current mode
+bool isSelection = _drawingController.isSelectionMode;
+```
+
+Add a selection mode toggle button to your toolbar:
+
+```dart
+DrawingBar(
+  controller: _drawingController,
+  tools: [
+    // ... other tools ...
+    DefaultActionItem(
+      onTap: (controller) {
+        controller.setSelectionMode(!controller.isSelectionMode);
+      },
+      childBuilder: (context, controller) {
+        return Icon(
+          controller.isSelectionMode ? Icons.pan_tool : Icons.edit,
+          size: 24,
+          color: controller.isSelectionMode ? Colors.blue : Colors.grey,
+        );
+      },
+    ),
+  ],
+)
+```
+
 ### 4. Toolbar System
 
 #### DrawingBar

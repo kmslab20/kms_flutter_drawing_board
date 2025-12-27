@@ -2,8 +2,8 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'drawing_controller.dart';
 
+import 'drawing_controller.dart';
 import 'helper/ex_value_builder.dart';
 import 'helper/get_size.dart';
 import 'painter.dart';
@@ -159,20 +159,31 @@ class DrawingBoard extends StatelessWidget {
       onPointerDown: (PointerDownEvent pde) => _controller.addFingerCount(pde.localPosition),
       onPointerUp: (PointerUpEvent pue) => _controller.reduceFingerCount(pue.localPosition),
       onPointerCancel: (PointerCancelEvent pce) => _controller.reduceFingerCount(pce.localPosition),
-      child: InteractiveViewer(
-        maxScale: maxScale,
-        minScale: minScale,
-        boundaryMargin: boardBoundaryMargin ?? EdgeInsets.all(MediaQuery.of(context).size.width),
-        clipBehavior: boardClipBehavior,
-        panAxis: panAxis,
-        constrained: boardConstrained,
-        onInteractionStart: onInteractionStart,
-        onInteractionUpdate: onInteractionUpdate,
-        onInteractionEnd: onInteractionEnd,
-        scaleFactor: boardScaleFactor,
-        panEnabled: boardPanEnabled,
-        scaleEnabled: boardScaleEnabled,
-        transformationController: transformationController,
+      child: ExValueBuilder<DrawConfig>(
+        valueListenable: _controller.drawConfig,
+        shouldRebuild: (DrawConfig p, DrawConfig n) => p.isSelectionMode != n.isSelectionMode,
+        builder: (_, DrawConfig config, Widget? child) {
+          // 선택 모드일 때만 InteractiveViewer의 pan/scale 활성화
+          final bool enableInteraction = config.isSelectionMode;
+
+          return InteractiveViewer(
+            maxScale: maxScale,
+            minScale: minScale,
+            boundaryMargin:
+                boardBoundaryMargin ?? EdgeInsets.all(MediaQuery.of(context).size.width),
+            clipBehavior: boardClipBehavior,
+            panAxis: panAxis,
+            constrained: boardConstrained,
+            onInteractionStart: onInteractionStart,
+            onInteractionUpdate: onInteractionUpdate,
+            onInteractionEnd: onInteractionEnd,
+            scaleFactor: boardScaleFactor,
+            panEnabled: enableInteraction && boardPanEnabled,
+            scaleEnabled: enableInteraction && boardScaleEnabled,
+            transformationController: transformationController,
+            child: child!,
+          );
+        },
         child: Align(alignment: alignment, child: _buildBoard),
       ),
     );
