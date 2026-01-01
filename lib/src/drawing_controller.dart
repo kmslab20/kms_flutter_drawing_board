@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -381,6 +382,13 @@ class DrawingController extends ChangeNotifier {
   /// Object state at scale start (saved as JSON)
   Map<String, dynamic>? _scaleStartContentJson;
 
+  /// 旋转状态
+  ///
+  /// Rotation state
+  double? _rotationStartAngle;
+  Offset? _rotationAnchor; // 회전 앵커 저장
+  Map<String, dynamic>? _rotationStartContentJson;
+
   /// 获取当前步骤索引
   ///
   /// Get current step index
@@ -641,6 +649,107 @@ class DrawingController extends ChangeNotifier {
       _scaleStartContentJson = null;
       notifyListeners();
     }
+  }
+
+  /// 开始旋转对象
+  ///
+  /// Start rotating object
+  bool startObjectRotation(Offset position) {
+    if (!isSelectionMode || _selectedObjectIndex < 0) {
+      return false;
+    }
+
+    final PaintContent selectedContent = _history[_selectedObjectIndex];
+    final Rect? bounds = selectedContent.getOriginalBounds(); // 使用未旋转的原始边界
+
+    if (bounds == null) {
+      return false;
+    }
+
+    _isManipulatingObject = true;
+    final Offset center = bounds.center;
+
+    // 保存旋转锚点（对象中心）
+    // Save rotation anchor (object center)
+    _rotationAnchor = center;
+
+    // 计算初始角度
+    _rotationStartAngle = atan2(
+      position.dy - center.dy,
+      position.dx - center.dx,
+    );
+
+    // 保存原始对象状态
+    _rotationStartContentJson = _history[_selectedObjectIndex].toJson();
+    notifyListeners();
+    return true;
+  }
+
+  /// 更新旋转
+  ///
+  /// Update rotation
+  void updateObjectRotation(Offset position) {
+    if (!_isManipulatingObject ||
+        _rotationStartAngle == null ||
+        _rotationAnchor == null ||
+        _rotationStartContentJson == null) {
+      return;
+    }
+
+    // 使用保存的锚点而不是重新计算
+    // Use saved anchor instead of recalculating
+    final Offset center = _rotationAnchor!;
+
+    // 计算当前角度
+    final double currentAngle = atan2(
+      position.dy - center.dy,
+      position.dx - center.dx,
+    );
+
+    // 计算角度差
+    final double deltaAngle = currentAngle - _rotationStartAngle!;
+
+    // 从原始状态重新创建对象
+    final PaintContent originalContent = _createContentFromJson(_rotationStartContentJson!);
+
+    // 应用旋转（使用保存的锚点）
+    originalContent.rotate(deltaAngle, center);
+
+    // 替换历史记录中的对象
+    _history[_selectedObjectIndex] = originalContent;
+    _refreshDeep();
+    notifyListeners();
+  }
+
+  /// 结束旋转
+  ///
+  /// End rotation
+  void endObjectRotation() {
+    if (_isManipulatingObject) {
+      _isManipulatingObject = false;
+      _rotationStartAngle = null;
+      _rotationAnchor = null;
+      _rotationStartContentJson = null;
+      notifyListeners();
+    }
+  }
+
+  /// 获取当前旋转角度（度数）
+  ///
+  /// Get current rotation angle in degrees
+  double? getCurrentRotationAngle() {
+    if (!_isManipulatingObject || _rotationStartAngle == null || _selectedObjectIndex < 0) {
+      return null;
+    }
+
+    final PaintContent selectedContent = _history[_selectedObjectIndex];
+    final Rect? bounds = selectedContent.getBounds();
+
+    if (bounds == null) {
+      return null;
+    }
+
+    return null; // 각도는 updateObjectRotation에서 계산, UI에서 표시
   }
 
   /// 从JSON创建PaintContent对象

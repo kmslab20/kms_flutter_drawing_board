@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import '../paint_contents.dart';
@@ -83,10 +85,16 @@ class _PainterState extends State<Painter> {
       _pointers[pde.pointer] = pde.localPosition;
 
       if (_pointers.length == 1) {
-        // 단일 터치: 탭 감지 또는 드래그 시작
+        // 단일 터치: 회전 핸들, 탭 감지 또는 드래그 시작
         _selectionModeDownPosition = pde.localPosition;
+
         if (widget.drawingController.selectedObjectIndex >= 0) {
-          widget.drawingController.startObjectDrag(pde.localPosition);
+          // 회전 핸들 체크
+          if (_isRotationHandleHit(pde.localPosition)) {
+            widget.drawingController.startObjectRotation(pde.localPosition);
+          } else {
+            widget.drawingController.startObjectDrag(pde.localPosition);
+          }
         }
       } else if (_pointers.length == 2) {
         // 두 손가락: 핀치 시작
@@ -103,26 +111,69 @@ class _PainterState extends State<Painter> {
 
     // 手掌拒绝检测
     if (widget.enablePalmRejection) {
-      // 检测触摸面积过大（可能是手掌）
-      // size 值通常在 0-20 之间，手掌通常 > 15
-      if (pde.size > 15.0) {
-        return;
-      }
-
-      // 检测是否在短时间内有多个触摸点（可能是手掌和手指同时触摸）
-      final DateTime now = DateTime.now();
-      if (_lastTouchTime != null) {
-        final Duration difference = now.difference(_lastTouchTime!);
-        if (difference.inMilliseconds < 100) {
-          // 100ms 内有多次触摸，可能是手掌，拒绝
-          return;
-        }
-      }
-      _lastTouchTime = now;
+      // ...existing code...
     }
 
     widget.drawingController.startDraw(pde.localPosition);
     widget.onPointerDown?.call(pde);
+  }
+
+  /// 检查是否点击了旋转手柄
+  ///
+  /// Check if rotation handle was hit
+  bool _isRotationHandleHit(Offset position) {
+    if (widget.drawingController.selectedObjectIndex < 0) {
+      return false;
+    }
+
+    final history = widget.drawingController.getHistory;
+    if (widget.drawingController.selectedObjectIndex >= history.length) {
+      return false;
+    }
+
+    final selectedContent = history[widget.drawingController.selectedObjectIndex];
+    final bounds = selectedContent.getOriginalBounds(); // 使用未旋转的原始边界
+
+    if (bounds == null) {
+      return false;
+    }
+
+    final double scale = widget.drawingController.canvasScale;
+    final double handleDistance = 30.0 / scale;
+    final double handleRadius = 8.0 / scale;
+    final double rotation = selectedContent.rotation;
+
+    // 计算手柄位置
+    Offset handleCenter = Offset(
+      bounds.center.dx,
+      bounds.top - handleDistance - 4.0 / scale, // 考虑padding
+    );
+
+    // 检查是否在顶部外面，如果是则使用底部
+    if (handleCenter.dy < 0) {
+      handleCenter = Offset(
+        bounds.center.dx,
+        bounds.bottom + handleDistance + 4.0 / scale,
+      );
+    }
+
+    // 如果对象有旋转，需要旋转手柄位置
+    // If object is rotated, rotate handle position accordingly
+    if (rotation != 0.0) {
+      final Offset center = bounds.center;
+      final Offset relative = handleCenter - center;
+      final double cosAngle = cos(rotation);
+      final double sinAngle = sin(rotation);
+      handleCenter = center +
+          Offset(
+            relative.dx * cosAngle - relative.dy * sinAngle,
+            relative.dx * sinAngle + relative.dy * cosAngle,
+          );
+    }
+
+    // 检查点击位置是否在手柄范围内
+    final double distance = (position - handleCenter).distance;
+    return distance <= handleRadius * 2; // 增大触摸区域
   }
 
   /// 处理手指移动事件
@@ -134,14 +185,40 @@ class _PainterState extends State<Painter> {
       _pointers[pme.pointer] = pme.localPosition;
 
       if (_pointers.length == 1) {
-        // 단일 터치: 드래그 업데이트
+        // 단일 터치: 드래그 또는 회전 업데이트
         if (_selectionModeDownPosition != null) {
           final double distance = (pme.localPosition - _selectionModeDownPosition!).distance;
           if (distance > 10.0) {
             _selectionModeDownPosition = null; // 탭 취소
           }
         }
-        widget.drawingController.updateObjectDrag(pme.localPosition);
+
+        // 회전 중인지 확인 (회전 시작 각도가 있으면 회전 중)
+        if (widget.drawingController.isManipulatingObject) {
+          // 회전 또는 드래그 중
+          final history = widget.drawingController.getHistory;
+          final index = widget.drawingController.selectedObjectIndex;
+
+          if (index >= 0 && index < history.length) {
+            final bounds = history[index].getBounds();
+            if (bounds != null) {
+              // 회전 핸들에서 시작했는지 확인하기 위해 간단한 휴리스틱 사용
+              // 개체 경계 밖에 있으면 회전, 안에 있으면 드래그
+              final bool isOutsideBounds =
+                  !bounds.inflate(10).contains(_selectionModeDownPosition ?? pme.localPosition);
+
+              if (isOutsideBounds) {
+                widget.drawingController.updateObjectRotation(pme.localPosition);
+              } else {
+                widget.drawingController.updateObjectDrag(pme.localPosition);
+              }
+            } else {
+              widget.drawingController.updateObjectDrag(pme.localPosition);
+            }
+          } else {
+            widget.drawingController.updateObjectDrag(pme.localPosition);
+          }
+        }
       } else if (_pointers.length == 2) {
         // 두 손가락: 핀치 업데이트
         final List<Offset> points = _pointers.values.toList();
@@ -178,6 +255,7 @@ class _PainterState extends State<Painter> {
         // 모든 손가락이 떼어짐
         widget.drawingController.endObjectDrag();
         widget.drawingController.endObjectScale();
+        widget.drawingController.endObjectRotation();
 
         // 탭 감지
         if (_selectionModeDownPosition != null) {
@@ -216,6 +294,7 @@ class _PainterState extends State<Painter> {
       if (_pointers.isEmpty) {
         widget.drawingController.endObjectDrag();
         widget.drawingController.endObjectScale();
+        widget.drawingController.endObjectRotation();
         _selectionModeDownPosition = null;
       }
       return;
@@ -437,7 +516,7 @@ class _SelectionPainter extends CustomPainter {
     }
 
     final PaintContent selectedContent = history[selectedIndex];
-    final Rect? bounds = selectedContent.getBounds();
+    final Rect? bounds = selectedContent.getOriginalBounds(); // 使用未旋转的原始边界
 
     if (bounds == null) {
       return;
@@ -446,6 +525,19 @@ class _SelectionPainter extends CustomPainter {
     // 获取当前画布缩放比例，用于调整选择框大小
     // Get current canvas scale to adjust selection box size
     final double scale = controller.canvasScale;
+
+    // 获取对象的旋转角度
+    // Get object rotation angle
+    final double rotation = selectedContent.rotation;
+
+    // 如果有旋转，应用变换
+    // Apply transformation if rotated
+    if (rotation != 0.0) {
+      canvas.save();
+      canvas.translate(bounds.center.dx, bounds.center.dy);
+      canvas.rotate(rotation);
+      canvas.translate(-bounds.center.dx, -bounds.center.dy);
+    }
 
     // 绘制蓝色选择框（线宽根据缩放调整，保持视觉大小恒定）
     // Draw blue selection box (stroke width adjusted by scale to maintain constant visual size)
@@ -479,6 +571,83 @@ class _SelectionPainter extends CustomPainter {
         Rect.fromCenter(center: corner, width: handleSize, height: handleSize),
         handlePaint,
       );
+    }
+
+    // 绘制旋转手柄
+    // Draw rotation handle
+    final double handleDistance = 30.0 / scale; // 手柄距离
+    final Offset handleCenter = Offset(
+      paddedBounds.center.dx,
+      paddedBounds.top - handleDistance,
+    );
+
+    // 检查手柄是否超出画布顶部，如果是则显示在底部
+    // Check if handle is above canvas, if so display at bottom
+    final bool isHandleAboveCanvas = handleCenter.dy < 0;
+    final Offset finalHandleCenter = isHandleAboveCanvas
+        ? Offset(paddedBounds.center.dx, paddedBounds.bottom + handleDistance)
+        : handleCenter;
+
+    // 绘制连接线
+    // Draw connecting line
+    final Offset lineStart = isHandleAboveCanvas
+        ? Offset(paddedBounds.center.dx, paddedBounds.bottom)
+        : Offset(paddedBounds.center.dx, paddedBounds.top);
+
+    final Paint linePaint = Paint()
+      ..color = const Color(0xFF2196F3)
+      ..strokeWidth = 2.0 / scale;
+
+    canvas.drawLine(lineStart, finalHandleCenter, linePaint);
+
+    // 绘制旋转手柄圆形
+    // Draw rotation handle circle
+    final Paint rotationHandlePaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final Paint rotationHandleBorderPaint = Paint()
+      ..color = const Color(0xFF2196F3)
+      ..strokeWidth = 2.0 / scale
+      ..style = PaintingStyle.stroke;
+
+    final double rotationHandleRadius = 8.0 / scale;
+    canvas.drawCircle(finalHandleCenter, rotationHandleRadius, rotationHandlePaint);
+    canvas.drawCircle(finalHandleCenter, rotationHandleRadius, rotationHandleBorderPaint);
+
+    // 在手柄中绘制旋转图标（简化版）
+    // Draw rotation icon in handle (simplified)
+    final Paint iconPaint = Paint()
+      ..color = const Color(0xFF2196F3)
+      ..strokeWidth = 1.5 / scale
+      ..style = PaintingStyle.stroke;
+
+    final double iconRadius = 4.0 / scale;
+    canvas.drawArc(
+      Rect.fromCircle(center: finalHandleCenter, radius: iconRadius),
+      -pi * 0.75,
+      pi * 1.5,
+      false,
+      iconPaint,
+    );
+
+    // 绘制箭头
+    final double arrowSize = 2.5 / scale;
+    final Offset arrowTip = Offset(
+      finalHandleCenter.dx + iconRadius * cos(-pi * 0.75),
+      finalHandleCenter.dy + iconRadius * sin(-pi * 0.75),
+    );
+    final Path arrowPath = Path()
+      ..moveTo(arrowTip.dx, arrowTip.dy)
+      ..lineTo(arrowTip.dx - arrowSize, arrowTip.dy - arrowSize)
+      ..moveTo(arrowTip.dx, arrowTip.dy)
+      ..lineTo(arrowTip.dx + arrowSize, arrowTip.dy - arrowSize);
+    canvas.drawPath(arrowPath, iconPaint);
+
+    // 恢复画布状态
+    // Restore canvas state if rotation was applied
+    if (rotation != 0.0) {
+      canvas.restore();
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import '../paint_extension/ex_offset.dart';
@@ -393,6 +394,21 @@ class SmoothLine extends PaintContent {
 
     // Scale stroke widths as well
     strokeWidthList = strokeWidthList.map((double w) => w * scale).toList();
+  }
+
+  @override
+  void rotate(double angle, Offset anchor) {
+    final double cos = math.cos(angle);
+    final double sin = math.sin(angle);
+
+    points = points.map((Offset p) {
+      final Offset relative = p - anchor;
+      return anchor +
+          Offset(
+            relative.dx * cos - relative.dy * sin,
+            relative.dx * sin + relative.dy * cos,
+          );
+    }).toList();
   }
 
   @override

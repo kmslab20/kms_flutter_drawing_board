@@ -22,6 +22,11 @@ abstract class PaintContent {
   /// Paint configuration for drawing
   late Paint paint;
 
+  /// 旋转角度（弧度）
+  ///
+  /// Rotation angle in radians
+  double rotation = 0.0;
+
   /// 复制实例，避免对象引用传递
   ///
   /// Copy instance to avoid object reference passing
@@ -66,6 +71,13 @@ abstract class PaintContent {
     return null; // 默认实现，子类应重写
   }
 
+  /// 获取未旋转时的原始边界矩形（用于选择框显示）
+  ///
+  /// Get the original bounding rectangle before rotation (for selection box display)
+  Rect? getOriginalBounds() {
+    return getBounds(); // 默认实现，子类可以重写以优化
+  }
+
   /// 移动对象
   /// [offset] 移动的偏移量
   ///
@@ -84,6 +96,17 @@ abstract class PaintContent {
   /// [anchor] Center point for scaling
   void scale(double scale, Offset anchor) {
     // 默认实现，子类应重写
+  }
+
+  /// 旋转对象
+  /// [angle] 旋转角度（弧度）
+  /// [anchor] 旋转中心点（不再使用，保留以兼容接口）
+  ///
+  /// Rotate the object
+  /// [angle] Rotation angle in radians
+  /// [anchor] Center point for rotation (no longer used, kept for interface compatibility)
+  void rotate(double angle, Offset anchor) {
+    rotation = angle; // 直接设置旋转角度而不是变换点
   }
 
   /// 转换为JSON内容（子类实现）

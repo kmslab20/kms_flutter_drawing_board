@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/painting.dart';
 
 import '../draw_path/draw_path.dart';
@@ -44,8 +46,9 @@ class SimpleLine extends PaintContent {
     // 兼容旧版本：如果有 points 就用新方式，否则用旧方式
     final bool hasPoints = data.containsKey('points');
 
+    final SimpleLine line;
     if (hasPoints) {
-      return SimpleLine.data(
+      line = SimpleLine.data(
         minPointDistance: (data['minPointDistance'] ?? 2.0) as double,
         useBezierCurve: (data['useBezierCurve'] ?? false) as bool,
         points: (data['points'] as List<dynamic>)
@@ -55,12 +58,16 @@ class SimpleLine extends PaintContent {
       );
     } else {
       // 旧版本兼容
-      return SimpleLine.data(
+      line = SimpleLine.data(
         minPointDistance: (data['minPointDistance'] ?? 2.0) as double,
         path: DrawPath.fromJson(data['path'] as Map<String, dynamic>),
         paint: jsonToPaint(data['paint'] as Map<String, dynamic>),
       );
     }
+
+    // 加载旋转角度
+    line.rotation = (data['rotation'] ?? 0.0) as double;
+    return line;
   }
 
   /// 最小点距离
@@ -130,11 +137,40 @@ class SimpleLine extends PaintContent {
   @override
   void draw(Canvas canvas, Size size, bool deeper) {
     if (useBezierCurve && points != null && points!.isNotEmpty) {
+      // 应用旋转
+      if (rotation != 0.0) {
+        final Rect? bounds = getOriginalBounds(); // 使用原始边界保持一致
+        if (bounds != null) {
+          canvas.save();
+          canvas.translate(bounds.center.dx, bounds.center.dy);
+          canvas.rotate(rotation);
+          canvas.translate(-bounds.center.dx, -bounds.center.dy);
+        }
+      }
+
       // 使用贝塞尔曲线绘制
       _drawWithBezierCurve(canvas);
+
+      if (rotation != 0.0) {
+        canvas.restore();
+      }
     } else {
       // 使用传统路径绘制
+      if (rotation != 0.0) {
+        final Rect pathBounds = path.path.getBounds();
+        if (!pathBounds.isEmpty) {
+          canvas.save();
+          canvas.translate(pathBounds.center.dx, pathBounds.center.dy);
+          canvas.rotate(rotation);
+          canvas.translate(-pathBounds.center.dx, -pathBounds.center.dy);
+        }
+      }
+
       canvas.drawPath(path.path, paint);
+
+      if (rotation != 0.0) {
+        canvas.restore();
+      }
     }
   }
 
@@ -198,10 +234,27 @@ class SimpleLine extends PaintContent {
   @override
   bool hitTest(Offset point, {double tolerance = 10.0}) {
     if (useBezierCurve && points != null && points!.isNotEmpty) {
+      // 如果有旋转，需要将测试点进行反向旋转
+      Offset testPoint = point;
+      if (rotation != 0.0) {
+        final Rect? bounds = getOriginalBounds(); // 使用原始边界保持一致
+        if (bounds != null) {
+          final Offset center = bounds.center;
+          final Offset relative = point - center;
+          final double cosAngle = cos(-rotation);
+          final double sinAngle = sin(-rotation);
+          testPoint = center +
+              Offset(
+                relative.dx * cosAngle - relative.dy * sinAngle,
+                relative.dx * sinAngle + relative.dy * cosAngle,
+              );
+        }
+      }
+
       // 检查点是否靠近线段上的任何点
       // Check if the point is near any point on the line
       for (final Offset p in points!) {
-        if ((p - point).distance <= tolerance) {
+        if ((p - testPoint).distance <= tolerance) {
           return true;
         }
       }
@@ -209,18 +262,36 @@ class SimpleLine extends PaintContent {
     } else {
       // 对于传统路径，检查点是否在路径附近
       // For traditional path, check if point is near the path
+      Offset testPoint = point;
+      if (rotation != 0.0) {
+        final Rect pathBounds = path.path.getBounds();
+        if (!pathBounds.isEmpty) {
+          final Offset center = pathBounds.center;
+          final Offset relative = point - center;
+          final double cosAngle = cos(-rotation);
+          final double sinAngle = sin(-rotation);
+          testPoint = center +
+              Offset(
+                relative.dx * cosAngle - relative.dy * sinAngle,
+                relative.dx * sinAngle + relative.dy * cosAngle,
+              );
+        }
+      }
+
       final Path expandedPath = Path()
         ..addPath(path.path, Offset.zero)
         ..close();
 
       // 使用扩展的边界进行粗略检测
       final Rect bounds = expandedPath.getBounds().inflate(tolerance);
-      return bounds.contains(point);
+      return bounds.contains(testPoint);
     }
   }
 
   @override
   Rect? getBounds() {
+    Rect? baseRect;
+
     if (useBezierCurve && points != null && points!.isNotEmpty) {
       double minX = points![0].dx;
       double minY = points![0].dy;
@@ -235,6 +306,80 @@ class SimpleLine extends PaintContent {
       }
 
       // 添加strokeWidth的padding
+      final double padding = paint.strokeWidth / 2;
+      baseRect = Rect.fromLTRB(
+        minX - padding,
+        minY - padding,
+        maxX + padding,
+        maxY + padding,
+      );
+    } else {
+      final Rect pathBounds = path.path.getBounds();
+      if (pathBounds.isEmpty) return null;
+
+      final double padding = paint.strokeWidth / 2;
+      baseRect = pathBounds.inflate(padding);
+    }
+
+    // 如果有旋转，需要计算旋转后的包围盒
+    // If rotated, need to calculate rotated bounding box
+    if (rotation != 0.0) {
+      final Offset center = baseRect.center;
+      final List<Offset> corners = <Offset>[
+        baseRect.topLeft,
+        baseRect.topRight,
+        baseRect.bottomLeft,
+        baseRect.bottomRight,
+      ];
+
+      // 旋转所有角点
+      final double cosAngle = cos(rotation);
+      final double sinAngle = sin(rotation);
+      final List<Offset> rotatedCorners = corners.map((Offset corner) {
+        final Offset relative = corner - center;
+        return center +
+            Offset(
+              relative.dx * cosAngle - relative.dy * sinAngle,
+              relative.dx * sinAngle + relative.dy * cosAngle,
+            );
+      }).toList();
+
+      // 找到新的边界
+      double minX = rotatedCorners[0].dx;
+      double minY = rotatedCorners[0].dy;
+      double maxX = rotatedCorners[0].dx;
+      double maxY = rotatedCorners[0].dy;
+
+      for (final Offset corner in rotatedCorners) {
+        if (corner.dx < minX) minX = corner.dx;
+        if (corner.dy < minY) minY = corner.dy;
+        if (corner.dx > maxX) maxX = corner.dx;
+        if (corner.dy > maxY) maxY = corner.dy;
+      }
+
+      return Rect.fromLTRB(minX, minY, maxX, maxY);
+    }
+
+    return baseRect;
+  }
+
+  @override
+  Rect? getOriginalBounds() {
+    // 返回未旋转的原始边界（用于选择框）
+    // Return original bounds without rotation (for selection box)
+    if (useBezierCurve && points != null && points!.isNotEmpty) {
+      double minX = points![0].dx;
+      double minY = points![0].dy;
+      double maxX = points![0].dx;
+      double maxY = points![0].dy;
+
+      for (final Offset p in points!) {
+        if (p.dx < minX) minX = p.dx;
+        if (p.dy < minY) minY = p.dy;
+        if (p.dx > maxX) maxX = p.dx;
+        if (p.dy > maxY) maxY = p.dy;
+      }
+
       final double padding = paint.strokeWidth / 2;
       return Rect.fromLTRB(
         minX - padding,
@@ -277,6 +422,7 @@ class SimpleLine extends PaintContent {
         'useBezierCurve': useBezierCurve,
         'points': points!.map((Offset e) => e.toJson()).toList(),
         'paint': paint.toJson(),
+        'rotation': rotation,
       };
     } else {
       // 旧格式：保存路径（向后兼容）
@@ -285,6 +431,7 @@ class SimpleLine extends PaintContent {
         'useBezierCurve': useBezierCurve,
         'path': path.toJson(),
         'paint': paint.toJson(),
+        'rotation': rotation,
       };
     }
   }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 
 import '../paint_extension/ex_offset.dart';
@@ -126,6 +128,30 @@ class StraightLine extends PaintContent {
     if (endPoint != null) {
       final Offset relative = endPoint! - anchor;
       endPoint = anchor + relative * scale;
+    }
+  }
+
+  @override
+  void rotate(double angle, Offset anchor) {
+    if (startPoint != null) {
+      final Offset relative = startPoint! - anchor;
+      final double cos = math.cos(angle);
+      final double sin = math.sin(angle);
+      startPoint = anchor +
+          Offset(
+            relative.dx * cos - relative.dy * sin,
+            relative.dx * sin + relative.dy * cos,
+          );
+    }
+    if (endPoint != null) {
+      final Offset relative = endPoint! - anchor;
+      final double cos = math.cos(angle);
+      final double sin = math.sin(angle);
+      endPoint = anchor +
+          Offset(
+            relative.dx * cos - relative.dy * sin,
+            relative.dx * sin + relative.dy * cos,
+          );
     }
   }
 

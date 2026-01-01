@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/painting.dart';
 
 import '../paint_extension/ex_offset.dart';
@@ -155,6 +157,32 @@ class Circle extends PaintContent {
     endPoint = anchor + relativeEnd * scale;
 
     radius *= scale;
+  }
+
+  @override
+  void rotate(double angle, Offset anchor) {
+    final Offset relativeCenter = center - anchor;
+    final double cos = math.cos(angle);
+    final double sin = math.sin(angle);
+    center = anchor +
+        Offset(
+          relativeCenter.dx * cos - relativeCenter.dy * sin,
+          relativeCenter.dx * sin + relativeCenter.dy * cos,
+        );
+
+    final Offset relativeStart = startPoint - anchor;
+    startPoint = anchor +
+        Offset(
+          relativeStart.dx * cos - relativeStart.dy * sin,
+          relativeStart.dx * sin + relativeStart.dy * cos,
+        );
+
+    final Offset relativeEnd = endPoint - anchor;
+    endPoint = anchor +
+        Offset(
+          relativeEnd.dx * cos - relativeEnd.dy * sin,
+          relativeEnd.dx * sin + relativeEnd.dy * cos,
+        );
   }
 
   @override
