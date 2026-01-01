@@ -394,21 +394,26 @@ class _SelectionPainter extends CustomPainter {
       return;
     }
 
-    // 绘制蓝色选择框
-    // Draw blue selection box
+    // 获取当前画布缩放比例，用于调整选择框大小
+    // Get current canvas scale to adjust selection box size
+    final double scale = controller.canvasScale;
+
+    // 绘制蓝色选择框（线宽根据缩放调整，保持视觉大小恒定）
+    // Draw blue selection box (stroke width adjusted by scale to maintain constant visual size)
     final Paint selectionPaint = Paint()
       ..color = const Color(0xFF2196F3) // 蓝色
-      ..strokeWidth = 2.0
+      ..strokeWidth = 2.0 / scale // 除以scale使线宽在视觉上保持2.0
       ..style = PaintingStyle.stroke;
 
-    // 添加一些padding使选择框更明显
-    // Add padding to make selection box more visible
-    final Rect paddedBounds = bounds.inflate(4.0);
+    // 添加一些padding使选择框更明显（padding也根据缩放调整）
+    // Add padding to make selection box more visible (padding also adjusted by scale)
+    final double padding = 4.0 / scale;
+    final Rect paddedBounds = bounds.inflate(padding);
     canvas.drawRect(paddedBounds, selectionPaint);
 
-    // 绘制四个角的小方块
-    // Draw small squares at corners
-    final double handleSize = 8.0;
+    // 绘制四个角的小方块（大小根据缩放调整）
+    // Draw small squares at corners (size adjusted by scale)
+    final double handleSize = 8.0 / scale;
     final Paint handlePaint = Paint()
       ..color = const Color(0xFF2196F3)
       ..style = PaintingStyle.fill;

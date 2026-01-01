@@ -155,6 +155,10 @@ class DrawingBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // TransformationController를 DrawingController에 전달
+    // Pass TransformationController to DrawingController
+    _controller.transformationController = transformationController;
+
     return Listener(
       onPointerDown: (PointerDownEvent pde) => _controller.addFingerCount(pde.localPosition),
       onPointerUp: (PointerUpEvent pue) => _controller.reduceFingerCount(pue.localPosition),

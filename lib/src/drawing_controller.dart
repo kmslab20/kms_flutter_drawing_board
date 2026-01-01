@@ -253,6 +253,38 @@ class DrawingController extends ChangeNotifier {
   /// Board data key for getting RenderObject to export images
   late GlobalKey painterKey = GlobalKey();
 
+  /// 变换控制器（用于获取当前缩放比例）
+  ///
+  /// Transformation controller (for getting current scale)
+  TransformationController? _transformationController;
+
+  /// 获取或设置变换控制器
+  /// 设置时会添加监听器以便在缩放变化时更新选择框
+  ///
+  /// Get or set transformation controller
+  /// When set, adds listener to update selection box on scale changes
+  TransformationController? get transformationController => _transformationController;
+  set transformationController(TransformationController? controller) {
+    // 移除旧的监听器
+    _transformationController?.removeListener(_onTransformationChanged);
+
+    _transformationController = controller;
+
+    // 添加新的监听器
+    _transformationController?.addListener(_onTransformationChanged);
+  }
+
+  /// 变换变化时的回调（用于更新选择框显示）
+  ///
+  /// Callback when transformation changes (to update selection box display)
+  void _onTransformationChanged() {
+    // 只在选择模式且有选中对象时才需要通知重绘
+    // Only notify repaint when in selection mode and an object is selected
+    if (isSelectionMode && _selectedObjectIndex >= 0) {
+      notifyListeners();
+    }
+  }
+
   /// 绘制配置通知器
   ///
   /// Drawing configuration notifier
@@ -332,6 +364,18 @@ class DrawingController extends ChangeNotifier {
   ///
   /// Get currently selected object index
   int get selectedObjectIndex => _selectedObjectIndex;
+
+  /// 获取当前画布缩放比例
+  ///
+  /// Get current canvas scale
+  double get canvasScale {
+    if (transformationController == null) {
+      return 1.0;
+    }
+    final Matrix4 matrix = transformationController!.value;
+    // Extract scale from transformation matrix
+    return matrix.getMaxScaleOnAxis();
+  }
 
   /// 获取当前画笔颜色
   ///
@@ -790,6 +834,10 @@ class DrawingController extends ChangeNotifier {
     if (!_mounted) {
       return;
     }
+
+    // 移除变换控制器监听器
+    // Remove transformation controller listener
+    _transformationController?.removeListener(_onTransformationChanged);
 
     drawConfig.dispose();
     realPainter?.dispose();
