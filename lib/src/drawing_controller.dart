@@ -651,10 +651,10 @@ class DrawingController extends ChangeNotifier {
     }
   }
 
-  /// 开始旋转对象
+  /// 开始旋转对象（使用两指手势）
   ///
-  /// Start rotating object
-  bool startObjectRotation(Offset position) {
+  /// Start rotating object (using two-finger gesture)
+  bool startObjectRotation(Offset point1, Offset point2) {
     if (!isSelectionMode || _selectedObjectIndex < 0) {
       return false;
     }
@@ -677,35 +677,30 @@ class DrawingController extends ChangeNotifier {
     // Save the object's existing rotation angle at start
     _rotationStartValue = selectedContent.rotation;
 
-    // 计算初始角度
+    // 计算两指之间的初始角度
+    // Calculate initial angle between two fingers
     _rotationStartAngle = atan2(
-      position.dy - center.dy,
-      position.dx - center.dx,
+      point2.dy - point1.dy,
+      point2.dx - point1.dx,
     );
 
     notifyListeners();
     return true;
   }
 
-  /// 更新旋转
+  /// 更新旋转（使用两指手势）
   ///
-  /// Update rotation
-  void updateObjectRotation(Offset position) {
-    if (!_isManipulatingObject ||
-        _rotationStartAngle == null ||
-        _rotationAnchor == null ||
-        _rotationStartValue == null) {
+  /// Update rotation (using two-finger gesture)
+  void updateObjectRotation(Offset point1, Offset point2) {
+    if (!_isManipulatingObject || _rotationStartAngle == null || _rotationStartValue == null) {
       return;
     }
 
-    // 使用保存的锚点而不是重新计算
-    // Use saved anchor instead of recalculating
-    final Offset center = _rotationAnchor!;
-
-    // 计算当前角度
+    // 计算当前两指之间的角度
+    // Calculate current angle between two fingers
     final double currentAngle = atan2(
-      position.dy - center.dy,
-      position.dx - center.dx,
+      point2.dy - point1.dy,
+      point2.dx - point1.dx,
     );
 
     // 计算角度差
