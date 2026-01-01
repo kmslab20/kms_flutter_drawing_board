@@ -1,7 +1,7 @@
 import 'package:flutter/painting.dart';
+
 import '../paint_extension/ex_offset.dart';
 import '../paint_extension/ex_paint.dart';
-
 import 'paint_content.dart';
 
 /// 圆形/椭圆绘制内容
@@ -107,6 +107,20 @@ class Circle extends PaintContent {
 
   @override
   Circle copy() => Circle(isEllipse: isEllipse);
+
+  @override
+  bool hitTest(Offset point, {double tolerance = 10.0}) {
+    if (isEllipse) {
+      // 椭圆碰撞检测：检查点是否在椭圆内
+      final Rect rect = Rect.fromPoints(startPoint, endPoint).inflate(tolerance);
+      return rect.contains(point);
+    } else {
+      // 圆形碰撞检测：检查点到圆心的距离
+      final Offset actualCenter = startFromCenter ? startPoint : center;
+      final double distance = (point - actualCenter).distance;
+      return distance <= (radius + tolerance);
+    }
+  }
 
   @override
   Map<String, dynamic> toContentJson() {

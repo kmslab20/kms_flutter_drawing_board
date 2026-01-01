@@ -497,10 +497,26 @@ class DrawingController extends ChangeNotifier {
 
     _isDrawingValidContent = true;
 
-    if (_paintContent is Eraser) {
+    if (_paintContent is Eraser && eraserContent != null) {
       eraserContent?.drawing(nowPaint);
+
+      // 检测并标记被擦除的对象
+      // Check and mark objects to be deleted
+      final double tolerance = drawConfig.value.strokeWidth;
+      final Eraser eraser = eraserContent as Eraser;
+
+      for (int i = 0; i < _currentIndex; i++) {
+        if (!eraser.deletedIndices.contains(i)) {
+          // 检查当前点是否与该对象相交
+          if (_history[i].hitTest(nowPaint, tolerance: tolerance)) {
+            eraser.deletedIndices = [...eraser.deletedIndices, i];
+            // 触发重绘以显示删除效果
+            _refreshDeep();
+          }
+        }
+      }
+
       _refresh();
-      _refreshDeep();
     } else {
       drawingContent?.drawing(nowPaint);
       _refresh();
@@ -533,8 +549,13 @@ class DrawingController extends ChangeNotifier {
     }
 
     if (eraserContent != null) {
-      _history.add(eraserContent!);
-      _currentIndex = _history.length;
+      // 只有当橡皮擦删除了对象时才添加到历史记录
+      // Only add eraser to history if it deleted any objects
+      final Eraser eraser = eraserContent as Eraser;
+      if (eraser.deletedIndices.isNotEmpty) {
+        _history.add(eraserContent!);
+        _currentIndex = _history.length;
+      }
       eraserContent = null;
     }
 

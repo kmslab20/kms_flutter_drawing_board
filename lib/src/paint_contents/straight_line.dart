@@ -1,7 +1,7 @@
 import 'package:flutter/painting.dart';
+
 import '../paint_extension/ex_offset.dart';
 import '../paint_extension/ex_paint.dart';
-
 import 'paint_content.dart';
 
 /// 直线绘制内容
@@ -58,6 +58,38 @@ class StraightLine extends PaintContent {
 
   @override
   StraightLine copy() => StraightLine();
+
+  @override
+  bool hitTest(Offset point, {double tolerance = 10.0}) {
+    if (startPoint == null || endPoint == null) {
+      return false;
+    }
+
+    // 计算点到线段的距离
+    // Calculate distance from point to line segment
+    final double dx = endPoint!.dx - startPoint!.dx;
+    final double dy = endPoint!.dy - startPoint!.dy;
+
+    if (dx == 0 && dy == 0) {
+      // 起点和终点相同，检查点到起点的距离
+      return (point - startPoint!).distance <= tolerance;
+    }
+
+    final double t =
+        ((point.dx - startPoint!.dx) * dx + (point.dy - startPoint!.dy) * dy) / (dx * dx + dy * dy);
+
+    // 限制 t 在 [0, 1] 范围内，确保投影点在线段上
+    final double tClamped = t.clamp(0.0, 1.0);
+
+    // 计算投影点
+    final Offset projection = Offset(
+      startPoint!.dx + tClamped * dx,
+      startPoint!.dy + tClamped * dy,
+    );
+
+    // 检查点到投影点的距离
+    return (point - projection).distance <= tolerance;
+  }
 
   @override
   Map<String, dynamic> toContentJson() {

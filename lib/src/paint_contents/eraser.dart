@@ -1,37 +1,48 @@
 import 'package:flutter/material.dart';
+
 import '../draw_path/draw_path.dart';
 import '../paint_extension/ex_paint.dart';
-
 import 'paint_content.dart';
 
 /// 橡皮擦绘制内容
 ///
-/// 使用BlendMode.clear混合模式实现擦除效果
-/// 擦除路径会叠加在底层内容上，产生透明擦除效果
+/// 通过触摸检测删除完整对象的橡皮擦
+/// 类似于三星笔记的UX：触摸到对象时删除整个对象
 ///
 /// Eraser Drawing Content
 ///
-/// Uses BlendMode.clear blend mode to achieve erasing effect
-/// Eraser path is overlaid on the base content to produce transparent erasing effect
+/// Eraser that deletes complete objects by touch detection
+/// Similar to Samsung Notes UX: deletes entire object when touched
 class Eraser extends PaintContent {
-  Eraser();
+  Eraser() : deletedIndices = <int>[];
 
   Eraser.data({
     required this.drawPath,
     required Paint paint,
+    this.deletedIndices = const <int>[],
   }) : super.paint(paint);
 
   factory Eraser.fromJson(Map<String, dynamic> data) {
+    final dynamic deletedData = data['deletedIndices'];
+    final List<int> deleted =
+        deletedData != null ? List<int>.from(deletedData as List<dynamic>) : <int>[];
+
     return Eraser.data(
       drawPath: DrawPath.fromJson(data['path'] as Map<String, dynamic>),
       paint: jsonToPaint(data['paint'] as Map<String, dynamic>),
+      deletedIndices: deleted,
     );
   }
 
-  /// 擦除路径
+  /// 擦除路径（用于显示擦除轨迹）
   ///
-  /// Eraser path
+  /// Eraser path (for showing eraser trail)
   DrawPath drawPath = DrawPath();
+
+  /// 被删除的对象索引列表
+  ///
+  /// List of deleted object indices
+  List<int> deletedIndices;
 
   @override
   String get contentType => 'Eraser';
@@ -46,7 +57,20 @@ class Eraser extends PaintContent {
 
   @override
   void draw(Canvas canvas, Size size, bool deeper) {
-    canvas.drawPath(drawPath.path, paint.copyWith(blendMode: BlendMode.clear));
+    // 橡皮擦本身不绘制任何内容，只标记要删除的对象
+    // The eraser itself doesn't draw anything, just marks objects for deletion
+
+    // 可以选择绘制擦除轨迹用于视觉反馈（可选）
+    // Optionally draw eraser trail for visual feedback
+    if (!deeper) {
+      final Paint eraserPaint = Paint()
+        ..color = Colors.grey.withOpacity(0.3)
+        ..strokeWidth = paint.strokeWidth
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      canvas.drawPath(drawPath.path, eraserPaint);
+    }
   }
 
   @override
@@ -57,6 +81,7 @@ class Eraser extends PaintContent {
     return <String, dynamic>{
       'path': drawPath.toJson(),
       'paint': paint.toJson(),
+      'deletedIndices': deletedIndices,
     };
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 
 import '../paint_contents.dart';
@@ -237,26 +235,34 @@ class _UpPainter extends CustomPainter {
     }
 
     if (controller.eraserContent != null) {
-      // 橡皮擦模式：先绘制底层内容，再应用橡皮擦效果
-      canvas.saveLayer(Offset.zero & size, Paint());
+      // 橡皮擦模式：收集所有删除的对象索引（包括历史中的橡皮擦）
+      // Eraser mode: collect all deleted object indices (including from history erasers)
+      final Eraser currentEraser = controller.eraserContent as Eraser;
+      final List<PaintContent> history = controller.getHistory;
 
-      // 优先使用缓存图像，如果缓存不可用则实时绘制历史内容
-      if (controller.cachedImage != null) {
-        canvas.drawImage(controller.cachedImage!, Offset.zero, Paint());
-      } else {
-        // 缓存图像还未生成，实时绘制历史内容
-        final List<PaintContent> history = controller.getHistory;
-        for (int i = 0; i < controller.currentIndex; i++) {
-          if (i < history.length) {
-            history[i].draw(canvas, size, false);
-          }
+      // 收集历史中所有橡皮擦已删除的对象索引
+      // Collect all deleted indices from all erasers in history
+      final Set<int> allDeletedIndices = <int>{};
+      for (int i = 0; i < controller.currentIndex; i++) {
+        if (history[i] is Eraser) {
+          allDeletedIndices.addAll((history[i] as Eraser).deletedIndices);
+        }
+      }
+      // 添加当前橡皮擦标记的删除对象
+      // Add currently marked deletions
+      allDeletedIndices.addAll(currentEraser.deletedIndices);
+
+      // 绘制未被删除的对象，跳过所有橡皮擦本身
+      // Draw objects that are not deleted, skip all erasers
+      for (int i = 0; i < controller.currentIndex; i++) {
+        if (i < history.length && !allDeletedIndices.contains(i) && history[i] is! Eraser) {
+          history[i].draw(canvas, size, false);
         }
       }
 
-      // 应用橡皮擦效果
+      // 绘制当前橡皮擦轨迹以提供视觉反馈
+      // Draw current eraser trail for visual feedback
       controller.eraserContent?.draw(canvas, size, false);
-
-      canvas.restore();
     } else {
       controller.drawingContent?.draw(canvas, size, false);
     }
@@ -304,54 +310,21 @@ class _DeepPainter extends CustomPainter {
       return;
     }
 
-    // 检查历史记录中是否包含橡皮擦
-    // Check if history contains any Eraser content
-    final bool hasEraser = contents.any((content) => content is Eraser);
-
-    // 只在包含橡皮擦时使用缓存，否则直接绘制以保持矢量清晰度
-    // Only use cache when eraser is present, otherwise draw directly for vector sharpness
-    if (hasEraser) {
-      // 检查缓存是否有效：索引相同且尺寸相同
-      final bool cacheValid = _lastRenderedIndex == controller.currentIndex &&
-          _lastRenderedSize == size &&
-          controller.cachedImage != null;
-
-      if (cacheValid) {
-        // 直接使用缓存图片，避免重复渲染
-        canvas.drawImage(controller.cachedImage!, Offset.zero, Paint());
-        return;
+    // 收集所有被删除的对象索引
+    // Collect all deleted object indices from Eraser objects
+    final Set<int> deletedIndices = <int>{};
+    for (int i = 0; i < controller.currentIndex; i++) {
+      if (contents[i] is Eraser) {
+        deletedIndices.addAll((contents[i] as Eraser).deletedIndices);
       }
+    }
 
-      final ui.PictureRecorder recorder = ui.PictureRecorder();
-      final Canvas tempCanvas =
-          Canvas(recorder, Rect.fromPoints(Offset.zero, size.bottomRight(Offset.zero)));
-
-      canvas.saveLayer(Offset.zero & size, Paint());
-
-      for (int i = 0; i < controller.currentIndex; i++) {
-        contents[i].draw(canvas, size, true);
-        contents[i].draw(tempCanvas, size, true);
-      }
-
-      canvas.restore();
-
-      // 更新缓存版本信息
-      _lastRenderedIndex = controller.currentIndex;
-      _lastRenderedSize = size;
-
-      final ui.Picture picture = recorder.endRecording();
-
-      // 只在尺寸有效时生成缓存图片，避免 Invalid image dimensions 异常
-      // Only generate cached image when size is valid to avoid Invalid image dimensions exception
-      if (size.width > 0 && size.height > 0) {
-        picture.toImage(size.width.toInt(), size.height.toInt()).then((ui.Image value) {
-          controller.cachedImage = value;
-        });
-      }
-    } else {
-      // 没有橡皮擦，直接绘制矢量内容以保持清晰度
-      // No eraser, draw vector content directly for sharpness
-      for (int i = 0; i < controller.currentIndex; i++) {
+    // 直接绘制矢量内容以保持清晰度，跳过被删除的对象
+    // Draw vector content directly for sharpness, skip deleted objects
+    for (int i = 0; i < controller.currentIndex; i++) {
+      // 跳过已被删除的对象和橡皮擦本身
+      // Skip deleted objects and eraser itself
+      if (!deletedIndices.contains(i) && contents[i] is! Eraser) {
         contents[i].draw(canvas, size, true);
       }
     }

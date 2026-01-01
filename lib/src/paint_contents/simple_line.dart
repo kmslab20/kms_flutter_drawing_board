@@ -196,6 +196,30 @@ class SimpleLine extends PaintContent {
       );
 
   @override
+  bool hitTest(Offset point, {double tolerance = 10.0}) {
+    if (useBezierCurve && points != null && points!.isNotEmpty) {
+      // 检查点是否靠近线段上的任何点
+      // Check if the point is near any point on the line
+      for (final Offset p in points!) {
+        if ((p - point).distance <= tolerance) {
+          return true;
+        }
+      }
+      return false;
+    } else {
+      // 对于传统路径，检查点是否在路径附近
+      // For traditional path, check if point is near the path
+      final Path expandedPath = Path()
+        ..addPath(path.path, Offset.zero)
+        ..close();
+
+      // 使用扩展的边界进行粗略检测
+      final Rect bounds = expandedPath.getBounds().inflate(tolerance);
+      return bounds.contains(point);
+    }
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     if (useBezierCurve && points != null) {
       // 新格式：保存点列表

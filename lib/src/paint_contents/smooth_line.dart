@@ -1,4 +1,5 @@
 import 'dart:ui';
+
 import '../paint_extension/ex_offset.dart';
 import '../paint_extension/ex_paint.dart';
 import 'paint_content.dart';
@@ -338,6 +339,18 @@ class SmoothLine extends PaintContent {
         useBezierCurve: useBezierCurve,
         smoothLevel: smoothLevel,
       );
+
+  @override
+  bool hitTest(Offset point, {double tolerance = 10.0}) {
+    // 检查点是否靠近线条上的任何点
+    // Check if the point is near any point on the line
+    for (final Offset p in points) {
+      if ((p - point).distance <= tolerance) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   @override
   Map<String, dynamic> toContentJson() {

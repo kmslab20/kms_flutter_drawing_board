@@ -48,6 +48,17 @@ abstract class PaintContent {
   /// Start drawing (when finger is pressed down)
   void startDraw(Offset startPoint);
 
+  /// 检测点是否与绘制内容相交（用于对象选择和删除）
+  /// [point] 检测点的坐标
+  /// [tolerance] 容差范围（像素）
+  ///
+  /// Check if a point intersects with the drawn content (for object selection and deletion)
+  /// [point] The point to test
+  /// [tolerance] Tolerance range in pixels
+  bool hitTest(Offset point, {double tolerance = 10.0}) {
+    return false; // 默认实现，子类应重写
+  }
+
   /// 转换为JSON内容（子类实现）
   ///
   /// Convert to JSON content (implemented by subclasses)

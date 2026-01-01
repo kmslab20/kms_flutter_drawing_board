@@ -1,7 +1,7 @@
 import 'package:flutter/painting.dart';
+
 import '../paint_extension/ex_offset.dart';
 import '../paint_extension/ex_paint.dart';
-
 import 'paint_content.dart';
 
 /// 矩形绘制内容
@@ -58,6 +58,18 @@ class Rectangle extends PaintContent {
 
   @override
   Rectangle copy() => Rectangle();
+
+  @override
+  bool hitTest(Offset point, {double tolerance = 10.0}) {
+    if (startPoint == null || endPoint == null) {
+      return false;
+    }
+
+    final Rect rect = Rect.fromPoints(startPoint!, endPoint!);
+    final Rect expandedRect = rect.inflate(tolerance);
+
+    return expandedRect.contains(point);
+  }
 
   @override
   Map<String, dynamic> toContentJson() {
