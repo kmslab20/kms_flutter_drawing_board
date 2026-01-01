@@ -5,9 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'helper/safe_value_notifier.dart';
+import 'paint_contents/circle.dart';
 import 'paint_contents/eraser.dart';
 import 'paint_contents/paint_content.dart';
+import 'paint_contents/rectangle.dart';
 import 'paint_contents/simple_line.dart';
+import 'paint_contents/smooth_line.dart';
+import 'paint_contents/straight_line.dart';
 import 'paint_extension/ex_paint.dart';
 
 /// 绘制配置类
@@ -355,6 +359,28 @@ class DrawingController extends ChangeNotifier {
   /// Currently selected object index (-1 means no selection)
   int _selectedObjectIndex = -1;
 
+  /// 是否正在操作选中的对象（拖拽或缩放）
+  ///
+  /// Whether manipulating selected object (drag or scale)
+  bool _isManipulatingObject = false;
+
+  /// 单指拖拽开始位置
+  ///
+  /// Single finger drag start position
+  Offset? _dragStartPosition;
+
+  /// 双指缩放的初始状态
+  ///
+  /// Initial state for pinch scaling
+  double? _scaleStartDistance;
+  Offset? _scaleStartCenter;
+  double? _scaleStartFactor = 1.0;
+
+  /// 缩放开始时的对象状态（JSON序列化保存）
+  ///
+  /// Object state at scale start (saved as JSON)
+  Map<String, dynamic>? _scaleStartContentJson;
+
   /// 获取当前步骤索引
   ///
   /// Get current step index
@@ -364,6 +390,13 @@ class DrawingController extends ChangeNotifier {
   ///
   /// Get currently selected object index
   int get selectedObjectIndex => _selectedObjectIndex;
+
+  /// 是否正在操作对象（拖拽或缩放中）
+  /// 操作中时应禁用画布的pan/scale
+  ///
+  /// Whether object is being manipulated (dragging or scaling)
+  /// Canvas pan/scale should be disabled during manipulation
+  bool get isManipulatingObject => _isManipulatingObject;
 
   /// 获取当前画布缩放比例
   ///
@@ -475,6 +508,163 @@ class DrawingController extends ChangeNotifier {
     // 没有命中任何对象，取消选择
     // No object hit, deselect
     deselectObject();
+  }
+
+  /// 开始单指拖拽对象
+  ///
+  /// Start single finger drag of object
+  bool startObjectDrag(Offset position) {
+    if (!isSelectionMode || _selectedObjectIndex < 0) {
+      return false;
+    }
+
+    final PaintContent selectedContent = _history[_selectedObjectIndex];
+    final Rect? bounds = selectedContent.getBounds();
+
+    if (bounds == null) {
+      return false;
+    }
+
+    // 检查是否点击了对象
+    // Check if object was clicked
+    if (bounds.contains(position)) {
+      _isManipulatingObject = true;
+      _dragStartPosition = position;
+      notifyListeners();
+      return true;
+    }
+
+    return false;
+  }
+
+  /// 更新单指拖拽
+  ///
+  /// Update single finger drag
+  void updateObjectDrag(Offset position) {
+    if (!_isManipulatingObject || _dragStartPosition == null) {
+      return;
+    }
+
+    // 移动对象
+    final Offset delta = position - _dragStartPosition!;
+    _history[_selectedObjectIndex].translate(delta);
+    _dragStartPosition = position;
+    _refreshDeep(); // 确保底层画板重绘
+    notifyListeners();
+  }
+
+  /// 结束单指拖拽
+  ///
+  /// End single finger drag
+  void endObjectDrag() {
+    if (_isManipulatingObject) {
+      _isManipulatingObject = false;
+      _dragStartPosition = null;
+      notifyListeners();
+    }
+  }
+
+  /// 开始双指缩放对象
+  ///
+  /// Start pinch scaling of object
+  bool startObjectScale(Offset point1, Offset point2) {
+    if (!isSelectionMode || _selectedObjectIndex < 0) {
+      return false;
+    }
+
+    final PaintContent selectedContent = _history[_selectedObjectIndex];
+    final Rect? bounds = selectedContent.getBounds();
+
+    if (bounds == null) {
+      return false;
+    }
+
+    // 개체가 선택되어 있으면 어디서든 핀치 제스처를 개체에 적용
+    // If object is selected, apply pinch gesture to object from anywhere
+    _isManipulatingObject = true;
+    _scaleStartDistance = (point2 - point1).distance;
+    _scaleStartCenter = (point1 + point2) / 2;
+    _scaleStartFactor = 1.0;
+    // 保存原始对象状态
+    _scaleStartContentJson = _history[_selectedObjectIndex].toJson();
+
+    // 개체의 중심점을 앵커로 사용
+    // Use object center as anchor
+    final Offset objectCenter = bounds.center;
+    _scaleStartCenter = objectCenter;
+
+    notifyListeners();
+    return true;
+  }
+
+  /// 更新双指缩放
+  ///
+  /// Update pinch scaling
+  void updateObjectScale(Offset point1, Offset point2) {
+    if (!_isManipulatingObject ||
+        _scaleStartDistance == null ||
+        _scaleStartCenter == null ||
+        _scaleStartContentJson == null) {
+      return;
+    }
+
+    // 计算当前缩放比例
+    final double currentDistance = (point2 - point1).distance;
+
+    if (_scaleStartDistance! > 0) {
+      final double scaleFactor = currentDistance / _scaleStartDistance!;
+      // 限制缩放范围
+      final double clampedScale = scaleFactor.clamp(0.1, 10.0);
+
+      // 从原始状态重新创建对象
+      final PaintContent originalContent = _createContentFromJson(_scaleStartContentJson!);
+
+      // 应用缩放（使用对象中心点作为锚点，保持对象位置）
+      originalContent.scale(clampedScale, _scaleStartCenter!);
+
+      // 替换历史记录中的对象
+      _history[_selectedObjectIndex] = originalContent;
+      _refreshDeep(); // 确保底层画板重绘
+      notifyListeners();
+    }
+  }
+
+  /// 结束双指缩放
+  ///
+  /// End pinch scaling
+  void endObjectScale() {
+    if (_isManipulatingObject) {
+      _isManipulatingObject = false;
+      _scaleStartDistance = null;
+      _scaleStartCenter = null;
+      _scaleStartFactor = null;
+      _scaleStartContentJson = null;
+      notifyListeners();
+    }
+  }
+
+  /// 从JSON创建PaintContent对象
+  ///
+  /// Create PaintContent from JSON
+  PaintContent _createContentFromJson(Map<String, dynamic> json) {
+    final String type = json['type'] as String;
+
+    switch (type) {
+      case 'SimpleLine':
+        return SimpleLine.fromJson(json);
+      case 'SmoothLine':
+        return SmoothLine.fromJson(json);
+      case 'StraightLine':
+        return StraightLine.fromJson(json);
+      case 'Rectangle':
+        return Rectangle.fromJson(json);
+      case 'Circle':
+        return Circle.fromJson(json);
+      case 'Eraser':
+        return Eraser.fromJson(json);
+      default:
+        throw Exception('Unknown content type: $type');
+    }
   }
 
   /// 增加手指计数（手指按下时调用）

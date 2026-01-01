@@ -69,13 +69,31 @@ class _PainterState extends State<Painter> {
   /// Selection mode: record down position for tap detection
   Offset? _selectionModeDownPosition;
 
+  /// 多点触控跟踪（用于双指缩放）
+  ///
+  /// Multi-touch tracking (for pinch gestures)
+  final Map<int, Offset> _pointers = <int, Offset>{};
+
   /// 处理手指按下事件
   ///
   /// Handle pointer down event
   void _onPointerDown(PointerDownEvent pde) {
-    // 선택 모드에서는 탭 감지를 위해 위치 기록
+    // 선택 모드에서 멀티터치 처리
     if (widget.drawingController.isSelectionMode) {
-      _selectionModeDownPosition = pde.localPosition;
+      _pointers[pde.pointer] = pde.localPosition;
+
+      if (_pointers.length == 1) {
+        // 단일 터치: 탭 감지 또는 드래그 시작
+        _selectionModeDownPosition = pde.localPosition;
+        if (widget.drawingController.selectedObjectIndex >= 0) {
+          widget.drawingController.startObjectDrag(pde.localPosition);
+        }
+      } else if (_pointers.length == 2) {
+        // 두 손가락: 핀치 시작
+        _selectionModeDownPosition = null; // 탭 취소
+        final List<Offset> points = _pointers.values.toList();
+        widget.drawingController.startObjectScale(points[0], points[1]);
+      }
       return;
     }
 
@@ -111,14 +129,23 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer move event
   void _onPointerMove(PointerMoveEvent pme) {
-    // 선택 모드에서 이동하면 tap이 아니므로 위치 초기화
+    // 선택 모드에서 멀티터치 처리
     if (widget.drawingController.isSelectionMode) {
-      if (_selectionModeDownPosition != null) {
-        final double distance = (pme.localPosition - _selectionModeDownPosition!).distance;
-        // 이동 거리가 10픽셀 이상이면 tap이 아님
-        if (distance > 10.0) {
-          _selectionModeDownPosition = null;
+      _pointers[pme.pointer] = pme.localPosition;
+
+      if (_pointers.length == 1) {
+        // 단일 터치: 드래그 업데이트
+        if (_selectionModeDownPosition != null) {
+          final double distance = (pme.localPosition - _selectionModeDownPosition!).distance;
+          if (distance > 10.0) {
+            _selectionModeDownPosition = null; // 탭 취소
+          }
         }
+        widget.drawingController.updateObjectDrag(pme.localPosition);
+      } else if (_pointers.length == 2) {
+        // 두 손가락: 핀치 업데이트
+        final List<Offset> points = _pointers.values.toList();
+        widget.drawingController.updateObjectScale(points[0], points[1]);
       }
       return;
     }
@@ -143,16 +170,27 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer up event
   void _onPointerUp(PointerUpEvent pue) {
-    // 선택 모드에서 tap 감지 (down과 up 위치가 거의 같으면 tap)
+    // 선택 모드에서 멀티터치 처리
     if (widget.drawingController.isSelectionMode) {
-      if (_selectionModeDownPosition != null) {
-        final double distance = (pue.localPosition - _selectionModeDownPosition!).distance;
-        if (distance <= 10.0) {
-          // Tap 감지됨, 객체 선택 처리
-          widget.drawingController.selectObjectByPosition(pue.localPosition);
+      _pointers.remove(pue.pointer);
+
+      if (_pointers.isEmpty) {
+        // 모든 손가락이 떼어짐
+        widget.drawingController.endObjectDrag();
+        widget.drawingController.endObjectScale();
+
+        // 탭 감지
+        if (_selectionModeDownPosition != null) {
+          final double distance = (pue.localPosition - _selectionModeDownPosition!).distance;
+          if (distance <= 10.0) {
+            widget.drawingController.selectObjectByPosition(pue.localPosition);
+          }
         }
+        _selectionModeDownPosition = null;
+      } else if (_pointers.length == 1) {
+        // 두 손가락 중 하나만 떼어짐 - 스케일 종료
+        widget.drawingController.endObjectScale();
       }
-      _selectionModeDownPosition = null;
       return;
     }
 
@@ -172,6 +210,17 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer cancel event
   void _onPointerCancel(PointerCancelEvent pce) {
+    // 선택 모드에서 멀티터치 처리
+    if (widget.drawingController.isSelectionMode) {
+      _pointers.remove(pce.pointer);
+      if (_pointers.isEmpty) {
+        widget.drawingController.endObjectDrag();
+        widget.drawingController.endObjectScale();
+        _selectionModeDownPosition = null;
+      }
+      return;
+    }
+
     if (!widget.drawingController.couldDrawing) {
       return;
     }

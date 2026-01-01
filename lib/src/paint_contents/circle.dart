@@ -137,6 +137,27 @@ class Circle extends PaintContent {
   }
 
   @override
+  void translate(Offset offset) {
+    center += offset;
+    startPoint += offset;
+    endPoint += offset;
+  }
+
+  @override
+  void scale(double scale, Offset anchor) {
+    final Offset relativeCenter = center - anchor;
+    center = anchor + relativeCenter * scale;
+
+    final Offset relativeStart = startPoint - anchor;
+    startPoint = anchor + relativeStart * scale;
+
+    final Offset relativeEnd = endPoint - anchor;
+    endPoint = anchor + relativeEnd * scale;
+
+    radius *= scale;
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'isEllipse': isEllipse,

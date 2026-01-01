@@ -252,6 +252,23 @@ class SimpleLine extends PaintContent {
   }
 
   @override
+  void translate(Offset offset) {
+    if (useBezierCurve && points != null) {
+      points = points!.map((Offset p) => p + offset).toList();
+    }
+  }
+
+  @override
+  void scale(double scale, Offset anchor) {
+    if (useBezierCurve && points != null) {
+      points = points!.map((Offset p) {
+        final Offset relative = p - anchor;
+        return anchor + relative * scale;
+      }).toList();
+    }
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     if (useBezierCurve && points != null) {
       // 新格式：保存点列表

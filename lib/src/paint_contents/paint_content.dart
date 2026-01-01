@@ -66,6 +66,26 @@ abstract class PaintContent {
     return null; // 默认实现，子类应重写
   }
 
+  /// 移动对象
+  /// [offset] 移动的偏移量
+  ///
+  /// Move the object
+  /// [offset] The offset to move by
+  void translate(Offset offset) {
+    // 默认实现，子类应重写
+  }
+
+  /// 缩放对象（保持宽高比）
+  /// [scale] 缩放比例
+  /// [anchor] 缩放中心点
+  ///
+  /// Scale the object (maintaining aspect ratio)
+  /// [scale] Scale factor
+  /// [anchor] Center point for scaling
+  void scale(double scale, Offset anchor) {
+    // 默认实现，子类应重写
+  }
+
   /// 转换为JSON内容（子类实现）
   ///
   /// Convert to JSON content (implemented by subclasses)

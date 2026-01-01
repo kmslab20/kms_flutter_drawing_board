@@ -380,6 +380,22 @@ class SmoothLine extends PaintContent {
   }
 
   @override
+  void translate(Offset offset) {
+    points = points.map((Offset p) => p + offset).toList();
+  }
+
+  @override
+  void scale(double scale, Offset anchor) {
+    points = points.map((Offset p) {
+      final Offset relative = p - anchor;
+      return anchor + relative * scale;
+    }).toList();
+
+    // Scale stroke widths as well
+    strokeWidthList = strokeWidthList.map((double w) => w * scale).toList();
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'brushPrecision': brushPrecision,

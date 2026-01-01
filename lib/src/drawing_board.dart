@@ -163,12 +163,13 @@ class DrawingBoard extends StatelessWidget {
       onPointerDown: (PointerDownEvent pde) => _controller.addFingerCount(pde.localPosition),
       onPointerUp: (PointerUpEvent pue) => _controller.reduceFingerCount(pue.localPosition),
       onPointerCancel: (PointerCancelEvent pce) => _controller.reduceFingerCount(pce.localPosition),
-      child: ExValueBuilder<DrawConfig>(
-        valueListenable: _controller.drawConfig,
-        shouldRebuild: (DrawConfig p, DrawConfig n) => p.isSelectionMode != n.isSelectionMode,
-        builder: (_, DrawConfig config, Widget? child) {
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (BuildContext context, Widget? child) {
           // 선택 모드일 때만 InteractiveViewer의 pan/scale 활성화
-          final bool enableInteraction = config.isSelectionMode;
+          // 단, 개체 조작 중에는 비활성화하여 캔버스가 움직이지 않도록 함
+          final bool enableInteraction =
+              _controller.drawConfig.value.isSelectionMode && !_controller.isManipulatingObject;
 
           return InteractiveViewer(
             maxScale: maxScale,
@@ -185,10 +186,9 @@ class DrawingBoard extends StatelessWidget {
             panEnabled: enableInteraction && boardPanEnabled,
             scaleEnabled: enableInteraction && boardScaleEnabled,
             transformationController: transformationController,
-            child: child!,
+            child: Align(alignment: alignment, child: _buildBoard),
           );
         },
-        child: Align(alignment: alignment, child: _buildBoard),
       ),
     );
   }

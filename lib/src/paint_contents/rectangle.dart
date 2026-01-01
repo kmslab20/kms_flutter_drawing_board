@@ -83,6 +83,24 @@ class Rectangle extends PaintContent {
   }
 
   @override
+  void translate(Offset offset) {
+    if (startPoint != null) startPoint = startPoint! + offset;
+    if (endPoint != null) endPoint = endPoint! + offset;
+  }
+
+  @override
+  void scale(double scale, Offset anchor) {
+    if (startPoint != null) {
+      final Offset relative = startPoint! - anchor;
+      startPoint = anchor + relative * scale;
+    }
+    if (endPoint != null) {
+      final Offset relative = endPoint! - anchor;
+      endPoint = anchor + relative * scale;
+    }
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'startPoint': startPoint?.toJson(),
