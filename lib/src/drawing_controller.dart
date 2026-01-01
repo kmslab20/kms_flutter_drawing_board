@@ -387,7 +387,7 @@ class DrawingController extends ChangeNotifier {
   /// Rotation state
   double? _rotationStartAngle;
   Offset? _rotationAnchor; // 회전 앵커 저장
-  Map<String, dynamic>? _rotationStartContentJson;
+  double? _rotationStartValue; // 회전 시작 시 객체의 rotation 값
 
   /// 获取当前步骤索引
   ///
@@ -673,14 +673,16 @@ class DrawingController extends ChangeNotifier {
     // Save rotation anchor (object center)
     _rotationAnchor = center;
 
+    // 保存旋转开始时对象已有的旋转角度
+    // Save the object's existing rotation angle at start
+    _rotationStartValue = selectedContent.rotation;
+
     // 计算初始角度
     _rotationStartAngle = atan2(
       position.dy - center.dy,
       position.dx - center.dx,
     );
 
-    // 保存原始对象状态
-    _rotationStartContentJson = _history[_selectedObjectIndex].toJson();
     notifyListeners();
     return true;
   }
@@ -692,7 +694,7 @@ class DrawingController extends ChangeNotifier {
     if (!_isManipulatingObject ||
         _rotationStartAngle == null ||
         _rotationAnchor == null ||
-        _rotationStartContentJson == null) {
+        _rotationStartValue == null) {
       return;
     }
 
@@ -709,14 +711,10 @@ class DrawingController extends ChangeNotifier {
     // 计算角度差
     final double deltaAngle = currentAngle - _rotationStartAngle!;
 
-    // 从原始状态重新创建对象
-    final PaintContent originalContent = _createContentFromJson(_rotationStartContentJson!);
+    // 将角度差添加到初始旋转角度上
+    // Add delta angle to initial rotation angle
+    _history[_selectedObjectIndex].rotation = _rotationStartValue! + deltaAngle;
 
-    // 应用旋转（使用保存的锚点）
-    originalContent.rotate(deltaAngle, center);
-
-    // 替换历史记录中的对象
-    _history[_selectedObjectIndex] = originalContent;
     _refreshDeep();
     notifyListeners();
   }
@@ -729,7 +727,7 @@ class DrawingController extends ChangeNotifier {
       _isManipulatingObject = false;
       _rotationStartAngle = null;
       _rotationAnchor = null;
-      _rotationStartContentJson = null;
+      _rotationStartValue = null;
       notifyListeners();
     }
   }
