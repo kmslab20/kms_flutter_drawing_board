@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../paint_contents.dart';
 import 'drawing_controller.dart';
 import 'helper/ex_value_builder.dart';
-import 'paint_contents/paint_content.dart';
 
 /// 绘图板组件
 ///
@@ -305,42 +304,56 @@ class _DeepPainter extends CustomPainter {
       return;
     }
 
-    // 检查缓存是否有效：索引相同且尺寸相同
-    final bool cacheValid = _lastRenderedIndex == controller.currentIndex &&
-        _lastRenderedSize == size &&
-        controller.cachedImage != null;
+    // 检查历史记录中是否包含橡皮擦
+    // Check if history contains any Eraser content
+    final bool hasEraser = contents.any((content) => content is Eraser);
 
-    if (cacheValid) {
-      // 直接使用缓存图片，避免重复渲染
-      canvas.drawImage(controller.cachedImage!, Offset.zero, Paint());
-      return;
-    }
+    // 只在包含橡皮擦时使用缓存，否则直接绘制以保持矢量清晰度
+    // Only use cache when eraser is present, otherwise draw directly for vector sharpness
+    if (hasEraser) {
+      // 检查缓存是否有效：索引相同且尺寸相同
+      final bool cacheValid = _lastRenderedIndex == controller.currentIndex &&
+          _lastRenderedSize == size &&
+          controller.cachedImage != null;
 
-    final ui.PictureRecorder recorder = ui.PictureRecorder();
-    final Canvas tempCanvas =
-        Canvas(recorder, Rect.fromPoints(Offset.zero, size.bottomRight(Offset.zero)));
+      if (cacheValid) {
+        // 直接使用缓存图片，避免重复渲染
+        canvas.drawImage(controller.cachedImage!, Offset.zero, Paint());
+        return;
+      }
 
-    canvas.saveLayer(Offset.zero & size, Paint());
+      final ui.PictureRecorder recorder = ui.PictureRecorder();
+      final Canvas tempCanvas =
+          Canvas(recorder, Rect.fromPoints(Offset.zero, size.bottomRight(Offset.zero)));
 
-    for (int i = 0; i < controller.currentIndex; i++) {
-      contents[i].draw(canvas, size, true);
-      contents[i].draw(tempCanvas, size, true);
-    }
+      canvas.saveLayer(Offset.zero & size, Paint());
 
-    canvas.restore();
+      for (int i = 0; i < controller.currentIndex; i++) {
+        contents[i].draw(canvas, size, true);
+        contents[i].draw(tempCanvas, size, true);
+      }
 
-    // 更新缓存版本信息
-    _lastRenderedIndex = controller.currentIndex;
-    _lastRenderedSize = size;
+      canvas.restore();
 
-    final ui.Picture picture = recorder.endRecording();
+      // 更新缓存版本信息
+      _lastRenderedIndex = controller.currentIndex;
+      _lastRenderedSize = size;
 
-    // 只在尺寸有效时生成缓存图片，避免 Invalid image dimensions 异常
-    // Only generate cached image when size is valid to avoid Invalid image dimensions exception
-    if (size.width > 0 && size.height > 0) {
-      picture.toImage(size.width.toInt(), size.height.toInt()).then((ui.Image value) {
-        controller.cachedImage = value;
-      });
+      final ui.Picture picture = recorder.endRecording();
+
+      // 只在尺寸有效时生成缓存图片，避免 Invalid image dimensions 异常
+      // Only generate cached image when size is valid to avoid Invalid image dimensions exception
+      if (size.width > 0 && size.height > 0) {
+        picture.toImage(size.width.toInt(), size.height.toInt()).then((ui.Image value) {
+          controller.cachedImage = value;
+        });
+      }
+    } else {
+      // 没有橡皮擦，直接绘制矢量内容以保持清晰度
+      // No eraser, draw vector content directly for sharpness
+      for (int i = 0; i < controller.currentIndex; i++) {
+        contents[i].draw(canvas, size, true);
+      }
     }
   }
 
