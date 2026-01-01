@@ -318,10 +318,20 @@ class DrawingController extends ChangeNotifier {
   /// Whether valid content has been drawn (for distinguishing click from drawing)
   bool _isDrawingValidContent = false;
 
+  /// 当前选中的对象索引（-1 表示无选中）
+  ///
+  /// Currently selected object index (-1 means no selection)
+  int _selectedObjectIndex = -1;
+
   /// 获取当前步骤索引
   ///
   /// Get current step index
   int get currentIndex => _currentIndex;
+
+  /// 获取当前选中的对象索引
+  ///
+  /// Get currently selected object index
+  int get selectedObjectIndex => _selectedObjectIndex;
 
   /// 获取当前画笔颜色
   ///
@@ -365,6 +375,62 @@ class DrawingController extends ChangeNotifier {
   /// Set selection mode
   void setSelectionMode(bool enabled) {
     drawConfig.value = drawConfig.value.copyWith(isSelectionMode: enabled);
+    // 退出选择模式时清除选中状态
+    // Clear selection when exiting selection mode
+    if (!enabled) {
+      _selectedObjectIndex = -1;
+      notifyListeners();
+    }
+  }
+
+  /// 选择对象
+  ///
+  /// Select an object by index
+  void selectObject(int index) {
+    if (index >= 0 && index < _currentIndex) {
+      _selectedObjectIndex = index;
+      notifyListeners();
+    }
+  }
+
+  /// 取消选择
+  ///
+  /// Deselect current object
+  void deselectObject() {
+    if (_selectedObjectIndex != -1) {
+      _selectedObjectIndex = -1;
+      notifyListeners();
+    }
+  }
+
+  /// 通过点击位置选择对象
+  ///
+  /// Select object by tap position
+  void selectObjectByPosition(Offset position) {
+    if (!isSelectionMode) {
+      return;
+    }
+
+    final double tolerance = drawConfig.value.strokeWidth * 2;
+
+    // 从后往前检查（最新的对象优先）
+    // Check from back to front (newest objects first)
+    for (int i = _currentIndex - 1; i >= 0; i--) {
+      // 跳过橡皮擦对象
+      // Skip eraser objects
+      if (_history[i] is Eraser) {
+        continue;
+      }
+
+      if (_history[i].hitTest(position, tolerance: tolerance)) {
+        selectObject(i);
+        return;
+      }
+    }
+
+    // 没有命中任何对象，取消选择
+    // No object hit, deselect
+    deselectObject();
   }
 
   /// 增加手指计数（手指按下时调用）

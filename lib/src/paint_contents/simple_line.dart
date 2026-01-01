@@ -220,6 +220,38 @@ class SimpleLine extends PaintContent {
   }
 
   @override
+  Rect? getBounds() {
+    if (useBezierCurve && points != null && points!.isNotEmpty) {
+      double minX = points![0].dx;
+      double minY = points![0].dy;
+      double maxX = points![0].dx;
+      double maxY = points![0].dy;
+
+      for (final Offset p in points!) {
+        if (p.dx < minX) minX = p.dx;
+        if (p.dy < minY) minY = p.dy;
+        if (p.dx > maxX) maxX = p.dx;
+        if (p.dy > maxY) maxY = p.dy;
+      }
+
+      // 添加strokeWidth的padding
+      final double padding = paint.strokeWidth / 2;
+      return Rect.fromLTRB(
+        minX - padding,
+        minY - padding,
+        maxX + padding,
+        maxY + padding,
+      );
+    } else {
+      final Rect pathBounds = path.path.getBounds();
+      if (pathBounds.isEmpty) return null;
+
+      final double padding = paint.strokeWidth / 2;
+      return pathBounds.inflate(padding);
+    }
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     if (useBezierCurve && points != null) {
       // 新格式：保存点列表

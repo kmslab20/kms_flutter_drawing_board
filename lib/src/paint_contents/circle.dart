@@ -123,6 +123,20 @@ class Circle extends PaintContent {
   }
 
   @override
+  Rect? getBounds() {
+    if (isEllipse) {
+      final Rect rect = Rect.fromPoints(startPoint, endPoint);
+      final double padding = paint.strokeWidth / 2;
+      return rect.inflate(padding);
+    } else {
+      final Offset actualCenter = startFromCenter ? startPoint : center;
+      final double padding = paint.strokeWidth / 2;
+      final double totalRadius = radius + padding;
+      return Rect.fromCircle(center: actualCenter, radius: totalRadius);
+    }
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'isEllipse': isEllipse,

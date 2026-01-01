@@ -59,6 +59,13 @@ abstract class PaintContent {
     return false; // 默认实现，子类应重写
   }
 
+  /// 获取绘制内容的边界矩形
+  ///
+  /// Get the bounding rectangle of the drawn content
+  Rect? getBounds() {
+    return null; // 默认实现，子类应重写
+  }
+
   /// 转换为JSON内容（子类实现）
   ///
   /// Convert to JSON content (implemented by subclasses)

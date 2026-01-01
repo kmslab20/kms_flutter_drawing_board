@@ -353,6 +353,33 @@ class SmoothLine extends PaintContent {
   }
 
   @override
+  Rect? getBounds() {
+    if (points.isEmpty) {
+      return null;
+    }
+
+    double minX = points[0].dx;
+    double minY = points[0].dy;
+    double maxX = points[0].dx;
+    double maxY = points[0].dy;
+
+    for (final Offset p in points) {
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+
+    final double padding = paint.strokeWidth / 2;
+    return Rect.fromLTRB(
+      minX - padding,
+      minY - padding,
+      maxX + padding,
+      maxY + padding,
+    );
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'brushPrecision': brushPrecision,

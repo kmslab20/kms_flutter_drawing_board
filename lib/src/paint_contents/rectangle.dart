@@ -72,6 +72,17 @@ class Rectangle extends PaintContent {
   }
 
   @override
+  Rect? getBounds() {
+    if (startPoint == null || endPoint == null) {
+      return null;
+    }
+
+    final Rect rect = Rect.fromPoints(startPoint!, endPoint!);
+    final double padding = paint.strokeWidth / 2;
+    return rect.inflate(padding);
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'startPoint': startPoint?.toJson(),

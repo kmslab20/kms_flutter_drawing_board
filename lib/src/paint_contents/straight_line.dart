@@ -92,6 +92,26 @@ class StraightLine extends PaintContent {
   }
 
   @override
+  Rect? getBounds() {
+    if (startPoint == null || endPoint == null) {
+      return null;
+    }
+
+    final double minX = startPoint!.dx < endPoint!.dx ? startPoint!.dx : endPoint!.dx;
+    final double minY = startPoint!.dy < endPoint!.dy ? startPoint!.dy : endPoint!.dy;
+    final double maxX = startPoint!.dx > endPoint!.dx ? startPoint!.dx : endPoint!.dx;
+    final double maxY = startPoint!.dy > endPoint!.dy ? startPoint!.dy : endPoint!.dy;
+
+    final double padding = paint.strokeWidth / 2;
+    return Rect.fromLTRB(
+      minX - padding,
+      minY - padding,
+      maxX + padding,
+      maxY + padding,
+    );
+  }
+
+  @override
   Map<String, dynamic> toContentJson() {
     return <String, dynamic>{
       'startPoint': startPoint?.toJson(),

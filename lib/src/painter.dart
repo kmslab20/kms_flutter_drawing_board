@@ -64,12 +64,18 @@ class _PainterState extends State<Painter> {
   /// Timestamp of the last touch, used for palm rejection detection
   DateTime? _lastTouchTime;
 
+  /// 选择模式：记录按下位置用于检测tap
+  ///
+  /// Selection mode: record down position for tap detection
+  Offset? _selectionModeDownPosition;
+
   /// 处理手指按下事件
   ///
   /// Handle pointer down event
   void _onPointerDown(PointerDownEvent pde) {
-    // 선택 모드에서는 그리기 비활성화
+    // 선택 모드에서는 탭 감지를 위해 위치 기록
     if (widget.drawingController.isSelectionMode) {
+      _selectionModeDownPosition = pde.localPosition;
       return;
     }
 
@@ -105,8 +111,15 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer move event
   void _onPointerMove(PointerMoveEvent pme) {
-    // 선택 모드에서는 그리기 비활성화
+    // 선택 모드에서 이동하면 tap이 아니므로 위치 초기화
     if (widget.drawingController.isSelectionMode) {
+      if (_selectionModeDownPosition != null) {
+        final double distance = (pme.localPosition - _selectionModeDownPosition!).distance;
+        // 이동 거리가 10픽셀 이상이면 tap이 아님
+        if (distance > 10.0) {
+          _selectionModeDownPosition = null;
+        }
+      }
       return;
     }
 
@@ -130,8 +143,16 @@ class _PainterState extends State<Painter> {
   ///
   /// Handle pointer up event
   void _onPointerUp(PointerUpEvent pue) {
-    // 선택 모드에서는 그리기 비활성화
+    // 선택 모드에서 tap 감지 (down과 up 위치가 거의 같으면 tap)
     if (widget.drawingController.isSelectionMode) {
+      if (_selectionModeDownPosition != null) {
+        final double distance = (pue.localPosition - _selectionModeDownPosition!).distance;
+        if (distance <= 10.0) {
+          // Tap 감지됨, 객체 선택 처리
+          widget.drawingController.selectObjectByPosition(pue.localPosition);
+        }
+      }
+      _selectionModeDownPosition = null;
       return;
     }
 
@@ -169,15 +190,15 @@ class _PainterState extends State<Painter> {
 
   @override
   Widget build(BuildContext context) {
-    // 선택 모드일 때는 Listener가 이벤트를 가로채지 않도록 함
+    // 선택 모드일 때도 Listener가 이벤트를 받도록 함 (tap 감지 위해)
     final bool isSelectionMode = widget.drawingController.isSelectionMode;
 
     return Listener(
-      onPointerDown: isSelectionMode ? null : _onPointerDown,
-      onPointerMove: isSelectionMode ? null : _onPointerMove,
-      onPointerUp: isSelectionMode ? null : _onPointerUp,
+      onPointerDown: _onPointerDown,
+      onPointerMove: _onPointerMove,
+      onPointerUp: _onPointerUp,
       onPointerCancel: isSelectionMode ? null : _onPointerCancel,
-      behavior: isSelectionMode ? HitTestBehavior.translucent : HitTestBehavior.opaque,
+      behavior: HitTestBehavior.opaque,
       child: ExValueBuilder<DrawConfig>(
         valueListenable: widget.drawingController.drawConfig,
         shouldRebuild: (DrawConfig p, DrawConfig n) =>
@@ -204,6 +225,11 @@ class _PainterState extends State<Painter> {
                 child: CustomPaint(
                   isComplex: true,
                   painter: _UpPainter(controller: widget.drawingController),
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _SelectionPainter(controller: widget.drawingController),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -332,4 +358,76 @@ class _DeepPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DeepPainter oldDelegate) => false;
+}
+
+/// 选择框绘制器
+///
+/// 在选中的对象周围绘制蓝色选择框
+///
+/// Selection Box Painter
+///
+/// Draws blue selection box around selected object
+class _SelectionPainter extends CustomPainter {
+  _SelectionPainter({required this.controller}) : super(repaint: controller);
+
+  final DrawingController controller;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 只在选择模式且有选中对象时绘制
+    // Only draw when in selection mode and an object is selected
+    if (!controller.isSelectionMode || controller.selectedObjectIndex < 0) {
+      return;
+    }
+
+    final int selectedIndex = controller.selectedObjectIndex;
+    final List<PaintContent> history = controller.getHistory;
+
+    if (selectedIndex >= history.length) {
+      return;
+    }
+
+    final PaintContent selectedContent = history[selectedIndex];
+    final Rect? bounds = selectedContent.getBounds();
+
+    if (bounds == null) {
+      return;
+    }
+
+    // 绘制蓝色选择框
+    // Draw blue selection box
+    final Paint selectionPaint = Paint()
+      ..color = const Color(0xFF2196F3) // 蓝色
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    // 添加一些padding使选择框更明显
+    // Add padding to make selection box more visible
+    final Rect paddedBounds = bounds.inflate(4.0);
+    canvas.drawRect(paddedBounds, selectionPaint);
+
+    // 绘制四个角的小方块
+    // Draw small squares at corners
+    final double handleSize = 8.0;
+    final Paint handlePaint = Paint()
+      ..color = const Color(0xFF2196F3)
+      ..style = PaintingStyle.fill;
+
+    final List<Offset> corners = <Offset>[
+      paddedBounds.topLeft,
+      paddedBounds.topRight,
+      paddedBounds.bottomLeft,
+      paddedBounds.bottomRight,
+    ];
+
+    for (final Offset corner in corners) {
+      canvas.drawRect(
+        Rect.fromCenter(center: corner, width: handleSize, height: handleSize),
+        handlePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SelectionPainter oldDelegate) => true;
 }
